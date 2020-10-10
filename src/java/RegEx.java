@@ -1,9 +1,11 @@
 import java.util.Scanner;
 
-import jdk.nashorn.internal.runtime.regexp.joni.Regex;
+import javax.lang.model.util.ElementScanner6;
+
+//import jdk.nashorn.internal.runtime.regexp.joni.Regex;
 
 import java.util.ArrayList;
-
+import java.awt.List;
 import java.lang.Exception;
 
 public class RegEx {
@@ -264,53 +266,54 @@ class RegExTree {
   }
 }
 
-class Transition
-{
-  private int prev;
-  private int succ;
-  private String transition;
-  public Transition(int prev, int succ, String transition)
-  {
-    this.prev = prev;
-    this.succ = succ;
-    this.transition = transition;
-  }
-}
+
 
 //Automata
 class Automata2
 {
+  ArrayList<ArrayList<ArrayList<Integer>>> matrix;
+  //private ArrayList<Integer>[][] matrice;
   private static int cnt = 0;
-  private int start_state;
-  private int final_state;
-  private Automata2 leftTree;
-  private Automata2 rightTree;
-  public Automata2(int operator, RegExTree left, RegExTree right)
+
+  private void toAutomata(RegExTree tree)
   {
-
-    if(operator == RegEx.CONCAT)
+    int nb_states = numberState(tree);
+    for(int i=0; i<nb_states; i++) 
+      for(int j=0;j<122;j++)
+        matrix.add(new ArrayList<Integer>());
+    if(tree.getSubTrees().size()==0)
     {
-      leftTree = new Automata(left);
-      rightTree = new Automata(right);
-      this.start_state = leftTree.getStartState();
-      this.final_state = rightTree.getFinalState();
-    }
-    if(operator == RegEx.ALTERN)
-    {
-
+      
     }
   }
 
-  public int getFinalState()
+
+
+/**
+ * Allow to count and predict how many states the automata will contain
+ * @param tree      the regExTree we want to know the amount of states it contains
+ * @return          how many states will contain the automata
+ */
+  private int numberState(RegExTree tree)
   {
-    return final_state;
-  }
-  public int getStartState()
-  {
-    return start_state;
+    if(tree.getSubTrees().size()==0)
+    {
+      // leaf
+      return 2;
+    }
+    else if (tree.getSubTrees().size()==1)
+    { //case closure or simple letter needs the creation of two new states
+      return 2 + numberState(tree.getSubTrees().get(0));
+    }
+    else
+    {
+      //Union needs the creation of two new states (start,accepting)
+      return 2 + numberState(tree.getSubTrees().get(0)) + numberState(tree.getSubTrees().get(1));
+    }
   }
 }
 
+/*
 class Automata 
 {
     private ArrayList<Integer>[][] matrice;
@@ -348,3 +351,4 @@ class Automata
     }
 
 }
+*/
