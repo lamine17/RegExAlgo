@@ -51,6 +51,7 @@ public class RegEx {
         RegExTree ret = parse();
         Automata a = new Automata(ret);
         System.out.println(a.toString());
+        System.out.println(a.toStringTab());
         System.out.println("  >> Tree result: "+ret.toString()+".");
       } catch (Exception e) {
         System.err.println("  >> ERROR: syntax error for regEx \""+regEx+"\".");
@@ -308,9 +309,10 @@ class AutomataNode {
 	}
 }
 
+//Classe representant le noeud d'un arbre de la methode des sous ensemble
 class TabNode{
 	public ArrayList<Integer> ancetres; //repertorie l ensemble des entiers deja rencontrés
-	public ArrayList<Integer> courant; //repertorie les entiers courant
+	public ArrayList<Integer> courant; //repertorie les etats courant
 	public Map<Integer,TabNode> liens;
 	
 	public TabNode(ArrayList<Integer> ancetres) {
@@ -323,9 +325,17 @@ class TabNode{
 		courant.add(i);
 	}
 	
+	public void setLinks(ArrayList<Integer> links) {
+		this.courant = links;
+	}
+	
 	public void addLink(int trans, TabNode link) {
 		this.liens.put(trans, link);
 	}
+	public void delLink(int trans) {
+		this.liens.remove(trans);
+	}
+	
 	public ArrayList<Integer> getCourant(){
 		return this.courant;
 	}
@@ -343,18 +353,28 @@ class TabNode{
 
 class Automata 
 {
-    private AutomataNode start_node;
+	private static final int ID_EPSILON_TRANSITION = -1;
+	
+	private AutomataNode start_node;
     private AutomataNode final_node;
     private int id_node;
     private TabNode racine_det; // premier noeud du tableau deterministe
+    private ArrayList<Integer> transitions_c; //liste des transitions de l'automate
 
-    public Automata(RegExTree mytree)
-    {
-        start_node = new AutomataNode(0);
-        final_node = new AutomataNode(1);
-        id_node = 2;
+    public Automata(RegExTree mytree){
+    	id_node = 0;
+        start_node = new AutomataNode(id_node);
+        id_node++;
+        final_node = new AutomataNode(id_node);
+        id_node++;
+        
+        this.transitions_c = new ArrayList<Integer>();
         racine_det = new TabNode(new ArrayList<Integer>());
         toAutomata(mytree,start_node,final_node);
+        ArrayList<AutomataNode> ancetres = new ArrayList<AutomataNode>();
+        ancetres.add(start_node);
+        detTab(ancetres, racine_det, ID_EPSILON_TRANSITION);
+        
     }
     
     public String ArraytoString(ArrayList<AutomataNode> an) {
@@ -383,12 +403,36 @@ class Automata
     	return chaine;
     }
     
+    public String toStringRecTab(TabNode n, String chemin) {
+    	String chaine = "";
+    	
+    	chaine += chemin + " : ";
+    	for(int l : n.getCourant()) {
+    		chaine += " _ "+l;
+    	}
+    	chaine += "\n";
+    	
+    	for(int noeudi : n.getLinks().keySet()) {
+    		chaine += toStringRecTab(n.getLink(noeudi),chemin+"-"+(char)noeudi );
+    	}
+    	
+    	return chaine;
+    }
+    
     public String toString() {
     	String chaine = "Chaque ligne correspond a la liste des liens d'un noeud.\n n-1 correspond a la transition epsilon.\n";
     	ArrayList<Integer> deja = new ArrayList<Integer>();//cette arraylist servira a identifier les noeuds deja rencontree
 
     	return chaine+toStringRec(start_node, deja);
     }
+    
+    public String toStringTab() {
+    	String chaine = "Chaque ligne correspond a un noeud suivie par les etats de ce noeud.\n\n";
+    	ArrayList<Integer> deja = new ArrayList<Integer>();//cette arraylist servira a identifier les noeuds deja rencontree
+
+    	return chaine+toStringRecTab(this.racine_det,"0");
+    }
+
 
     private void toAutomata(RegExTree tree, AutomataNode start_node, AutomataNode final_node)
     {	
@@ -398,7 +442,7 @@ class Automata
     		id_node++;
     		AutomataNode node2 = new AutomataNode(id_node);
     		id_node++;
-    		node1.addTransition(-1, node2);
+    		node1.addTransition(ID_EPSILON_TRANSITION, node2);
     		toAutomata(tree.getSubTrees().get(0),start_node,node1);
     		toAutomata(tree.getSubTrees().get(1),node2,final_node);
     	}
@@ -407,10 +451,10 @@ class Automata
     		id_node++;
     		AutomataNode node2 = new AutomataNode(id_node);
     		id_node++;
-    		node2.addTransition(-1, node1);
-    		start_node.addTransition(-1, node1);
-    		node2.addTransition(-1, final_node);
-    		start_node.addTransition(-1, final_node);
+    		node2.addTransition(ID_EPSILON_TRANSITION, node1);
+    		start_node.addTransition(ID_EPSILON_TRANSITION, node1);
+    		node2.addTransition(ID_EPSILON_TRANSITION, final_node);
+    		start_node.addTransition(ID_EPSILON_TRANSITION, final_node);
     		toAutomata(tree.getSubTrees().get(0),node1,node2);
         }
         if (tree.getRoot()==RegEx.ALTERN) {
@@ -423,11 +467,11 @@ class Automata
     		AutomataNode node4 = new AutomataNode(id_node);
     		id_node++;
     		
-    		start_node.addTransition(-1, node1);
-    		start_node.addTransition(-1, node3);
+    		start_node.addTransition(ID_EPSILON_TRANSITION, node1);
+    		start_node.addTransition(ID_EPSILON_TRANSITION, node3);
     		
-    		node2.addTransition(-1, final_node);
-    		node4.addTransition(-1, final_node);
+    		node2.addTransition(ID_EPSILON_TRANSITION, final_node);
+    		node4.addTransition(ID_EPSILON_TRANSITION, final_node);
     		toAutomata(tree.getSubTrees().get(0),node1,node2);
     		toAutomata(tree.getSubTrees().get(1),node3,node4);
         }
@@ -435,6 +479,7 @@ class Automata
     	//Cas où il s'agit d'une feuille
     	if(tree.getSubTrees().isEmpty()) {
     		start_node.addTransition(tree.getRoot(),final_node);
+    		this.transitions_c.add(tree.getRoot());
     	}
     	
     }
@@ -442,15 +487,30 @@ class Automata
     //determination du tableau des grands ensemble
     public void detTab(ArrayList<AutomataNode> ancetres, TabNode noeud, int current_link) {
     	ArrayList<AutomataNode> cur = new ArrayList<AutomataNode>();
+    	int i;
+    	
+    	//On ajoute les noeuds accessible depuis le lien ajouté par les ancetre
     	for(AutomataNode a : ancetres) {
     		for(int link : a.getTransitions().keySet()) {
     			for(AutomataNode l : a.getTransition(link)) {
-	    			if((!ancetres.contains(l)) && ((link == current_link) || (link == -1))) {
+	    			if((!ancetres.contains(l)) && ((link == current_link) || (link == ID_EPSILON_TRANSITION))) {
 	    				 cur.add(l);
 	    			}
     			}
     		}
     	}
+    	
+    	//On ajoute les noeuds accessible depuis les noeuds courants
+    	for(i=0;i<cur.size();i++) {
+    		for(int link : cur.get(i).getTransitions().keySet()) {
+    			for(AutomataNode l : cur.get(i).getTransition(link)) {
+	    			if((!ancetres.contains(l)) && ((link == current_link) || (link == ID_EPSILON_TRANSITION)) && (!cur.contains(l)) ) {
+	    				 cur.add(l);
+	    			}
+    			}
+    		}
+    	}
+    	
     	//On considere toute les connections possibles si cur non vide
     	if(cur.isEmpty()) {
     		return;
@@ -462,21 +522,19 @@ class Automata
     			ancetres.add(c);
     			anc.add(c.getId());
     		}
+    		noeud.setLinks((ArrayList<Integer>) anc.clone());
     		
-    		
-    		TabNode noeud1 = new TabNode(anc);
-    		TabNode noeud2 = new TabNode(anc);
-    		TabNode noeud3 = new TabNode(anc);
-    		
-    		noeud.addLink(RegEx.CONCAT, noeud1);
-    		noeud.addLink(RegEx.ETOILE, noeud2);
-    		noeud.addLink(RegEx.ALTERN, noeud3);
-    		
-    		detTab(ancetres, noeud1, RegEx.CONCAT);
-    		detTab(ancetres, noeud2, RegEx.ETOILE);
-    		detTab(ancetres, noeud3, RegEx.ALTERN);
+    		for(AutomataNode c : ancetres) {
+    			anc.add(c.getId());
+    		}
+    		for(int ti : this.transitions_c) {
+	    		TabNode noeud1 = new TabNode(anc);
+	    		noeud.addLink(ti, noeud1);
+	    		detTab((ArrayList<AutomataNode>) ancetres.clone(), noeud1, ti);
+	    		if(noeud1.getCourant().isEmpty()) {
+	    			noeud.delLink(ti);
+	    		}
+    		}
     	}
     }
-    
-
 }
