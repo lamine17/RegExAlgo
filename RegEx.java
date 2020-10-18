@@ -464,8 +464,8 @@ class Automata
         for(ArrayList<String> cle : this.path_node.keySet()) {
         	System.out.println("cle="+cle+"\n");
         }
-        red(racine_det,new ArrayList<AutomataNodeD>());/*
-        opt(racine_det,new ArrayList<AutomataNodeD>());
+        red(racine_det,new ArrayList<AutomataNodeD>());
+        /*opt(racine_det,new ArrayList<AutomataNodeD>());
         System.out.println("Second\n");
         for(ArrayList<String> cle : this.path_node.keySet()) {
         	System.out.println("cle="+cle+"\n");
@@ -740,16 +740,12 @@ class Automata
     		}
     	}
     }
-    static int icc = 0 ;
+
     //Mise en place des redirections
     public void red(AutomataNodeD node, ArrayList<AutomataNodeD> deja) {
     			deja.add(node);
-    			System.out.println("icc = "+icc);
-    			icc++;
     	for(int key : node.getLinks().keySet()) {
     		if(node.getLink(key).isRedirection()) {
-    			System.out.println(" key " + (char) node.getTree().get(0).getRoot()+" p ="  + node.getCh()+"\n");    			
-    			System.out.println("suppp  = "+node.getLink(key).chemins + "vers = "+node.getLink(key).getRedirection().chemins);
     			node.addLink(key, node.getLink(key).getRedirection());
 
     		}
@@ -762,8 +758,6 @@ class Automata
     //Optimisation de l'automate deterministe
     public void opt(AutomataNodeD node, ArrayList<AutomataNodeD> deja) {
     	int k = 0;
-		System.out.println("++icc = "+icc);
-		icc++;
     	for(ArrayList<String> l : this.path_node.keySet()) {
     		if(node==this.path_node.get(l)) {
     			continue;
@@ -773,7 +767,6 @@ class Automata
     				k++;
     		}
     		if(k==node.getCh().size()) {
-    			//System.out.println("node === -"+node.getCh().get(0)+"-");
     			node.setRedirection(this.path_node.get(l));
     			break;
     		}
@@ -787,11 +780,9 @@ class Automata
     		}
     	}
     }
-    public int coo = -3;
     //Conversion des noeuds de l'automate deterministe en chaine de caractere
     public void toMap(AutomataNodeD node, ArrayList<AutomataNodeD> deja) {
 		deja.add(node);
-    	
     	ArrayList<String> cles = new ArrayList<String>();
     	
     	for(RegExTree t : node.getTree()){
@@ -804,13 +795,11 @@ class Automata
     		this.path_node.put(cles, node);
     	}
     	else {
-    		System.out.println("checkkkk"+cles+" arg "+coo);
     		node.setRedirection(this.path_node.get(cles));
     	}
     	
     	for(int key : node.getLinks().keySet()) {
     		if(!deja.contains(node.getLink(key))) {
-    			coo = key;
     			toMap(node.getLink(key),deja);
     		}
     	}
