@@ -279,19 +279,13 @@ class RegExTree {
 class AutomataNodeND {
 	
 	public int id;
-	public RegExTree tree;
 	public boolean acceptance; //determine si le noeud est celui d'acceptation de l'automate
 	public Map<Integer,ArrayList<AutomataNodeND>> transitions; //dictionnaire des transtions liée aux etats d'arrivees
 	
-	public AutomataNodeND(int id, RegExTree tree) {
-		this.tree = tree;
+	public AutomataNodeND(int id) {
 		this.id = id;
 		this.acceptance = false;
 		this.transitions = new HashMap<Integer,ArrayList<AutomataNodeND>>();
-	}
-	
-	public RegExTree getTree() {
-		return this.tree;
 	}
 	
 	public void setAcceptance() {
@@ -331,37 +325,18 @@ class AutomataNodeD{
 	public ArrayList<AutomataNodeD> ancetres; //repertorie les noeuds ancetres a celui ci
 	public ArrayList<AutomataNodeND> courant; //repertorie les etats du noeud courant
 	public Map<Integer,AutomataNodeD> liens;
-	public ArrayList<String> chemins;
-	public ArrayList<RegExTree> tree;
 	public boolean acceptance; //determine si le noeud est celui d'acceptation de l'automate
 	public boolean recursif; //determine si le noeud est recursif
 	public boolean redirect; // determine si un noeud redirigie vers un autre
 	public AutomataNodeD redirection; 
 	
 	public AutomataNodeD() {
-		this.tree = new ArrayList<RegExTree>();
 		this.acceptance = false;
 		this.redirect = false;
 		this.recursif = false;
 		this.ancetres = new ArrayList<AutomataNodeD>();
 		this.courant = new ArrayList<AutomataNodeND>();
 		this.liens = new HashMap<Integer,AutomataNodeD>();
-	}
-	
-	public void setCh(ArrayList<String> ch) {
-		this.chemins = ch;
-	}
-	
-	public ArrayList<String> getCh() {
-		return this.chemins;
-	}
-	
-	public void addChemin(RegExTree tree) {
-		this.tree.add(tree);
-	}
-	
-	public ArrayList<RegExTree> getTree(){
-		return this.tree;
 	}
 	
 	public void setAncetre(ArrayList<AutomataNodeD> anc) {
@@ -428,7 +403,7 @@ class AutomataNodeD{
 	public AutomataNodeD getLink(int trans){
 		return this.liens.get(trans);
 	}
-	public boolean isAncestre(int i) {
+	public boolean isAncestre(AutomataNodeD i) {
 		return this.ancetres.contains(i);
 	}
 }
@@ -439,43 +414,33 @@ class Automata
 	private static final int ID_EPSILON_TRANSITION = -1;
 	
 	private AutomataNodeND start_node;
-    private AutomataNodeND final_node;
-    private Map<ArrayList<String>,AutomataNodeD> path_node;
+	private AutomataNodeND final_node;
+	private boolean boucle;
     private int id_node;
     private AutomataNodeD racine_det; // premier noeud du tableau deterministe
-    private ArrayList<Integer> transitions_c; //liste des transitions de l'automate
+	private ArrayList<Integer> transitions_c; //liste des transitions de l'automate
+	
+	private ArrayList<AutomataNodeD> noeuds_det; // liste des noeud deterministe
 
     public Automata(RegExTree mytree){
     	id_node = 0;
-    	path_node = new HashMap<ArrayList<String>,AutomataNodeD>();
-        start_node = new AutomataNodeND(id_node,mytree);
+        start_node = new AutomataNodeND(id_node);
         id_node++;
-        final_node = new AutomataNodeND(id_node,new RegExTree(-2,new ArrayList<RegExTree>()));
+        final_node = new AutomataNodeND(id_node);
         id_node++;
-        final_node.setAcceptance();
+		final_node.setAcceptance();
+		this.boucle = false;
         
         this.transitions_c = new ArrayList<Integer>();
-        racine_det = new AutomataNodeD();
-        racine_det.addChemin(mytree);
-        toAutomata(mytree,start_node,final_node,new RegExTree(-2,new ArrayList<RegExTree>()));
-        detTabStart();
-        toMap(racine_det,new ArrayList<AutomataNodeD>());
-        System.out.println("First\n");
-        for(ArrayList<String> cle : this.path_node.keySet()) {
-        	System.out.println("cle="+cle+"\n");
-        }
-        red(racine_det,new ArrayList<AutomataNodeD>());
-        /*opt(racine_det,new ArrayList<AutomataNodeD>());
-        System.out.println("Second\n");
-        for(ArrayList<String> cle : this.path_node.keySet()) {
-        	System.out.println("cle="+cle+"\n");
-        }
-        red(racine_det,new ArrayList<AutomataNodeD>());
-        System.out.println("Third\n");
-        for(ArrayList<String> cle : this.path_node.keySet()) {
-        	System.out.println("cle="+cle+"\n");
-        }*/
-    }
+		racine_det = new AutomataNodeD();
+		this.noeuds_det = new ArrayList<AutomataNodeD>();
+		this.noeuds_det.add(racine_det);
+        toAutomata(mytree,start_node,final_node);
+		detTabStart();
+		//optimi();
+	}
+	
+	
     
     public String ArraytoString(ArrayList<AutomataNodeND> an) {
     	String chaine = "";
@@ -508,7 +473,8 @@ class Automata
     	if(deja.contains(n)) {
     		return chaine;
     	}
-    	deja.add(n);
+		deja.add(n);
+		chaine += "+"+n.getLinks().keySet();
     	
     	if((!n.isRecursif()) && (!n.isAcceptance())){
     		chaine += chemin + " : ";
@@ -545,34 +511,26 @@ class Automata
     }
 
 
-    private void toAutomata(RegExTree tree, AutomataNodeND start_node, AutomataNodeND final_node, RegExTree ts){	
+    private void toAutomata(RegExTree tree, AutomataNodeND start_node, AutomataNodeND final_node){	
     	//Cas où il s'agit d'une operation
-    	RegExTree new_tree = new RegExTree( -2 , new ArrayList<RegExTree>());
     	
     	if (tree.getRoot()==RegEx.CONCAT || tree.getRoot()==RegEx.DOT) {
-    		new_tree.subTrees.add(tree.getSubTrees().get(1));
-    		new_tree.subTrees.add(ts);
-    		
-    		AutomataNodeND node1 = new AutomataNodeND(id_node, new_tree);
+    		AutomataNodeND node1 = new AutomataNodeND(id_node);
     		id_node++;
     		
-    		AutomataNodeND node2 = new AutomataNodeND(id_node, new_tree);
+    		AutomataNodeND node2 = new AutomataNodeND(id_node);
     		id_node++;
 
     		
     		node1.addTransition(ID_EPSILON_TRANSITION, node2);
-    		toAutomata(tree.getSubTrees().get(0),start_node,node1,new_tree);
-    		toAutomata(tree.getSubTrees().get(1),node2,final_node,ts);
+    		toAutomata(tree.getSubTrees().get(0),start_node,node1);
+    		toAutomata(tree.getSubTrees().get(1),node2,final_node);
     	}
         if (tree.getRoot()==RegEx.ETOILE) {
-        	RegExTree new_tree1 = new RegExTree( RegEx.ETOILE , new ArrayList<RegExTree>());
-        	new_tree.subTrees.add(tree.getSubTrees().get(0));
-    		new_tree.subTrees.add(ts);
-        	new_tree1.subTrees.add(ts);
     		
-        	AutomataNodeND node1 = new AutomataNodeND(id_node, new_tree);
+        	AutomataNodeND node1 = new AutomataNodeND(id_node);
     		id_node++;
-    		AutomataNodeND node2 = new AutomataNodeND(id_node, new_tree1);
+    		AutomataNodeND node2 = new AutomataNodeND(id_node);
     		id_node++;
     		
     		
@@ -580,28 +538,20 @@ class Automata
     		start_node.addTransition(ID_EPSILON_TRANSITION, node1);
     		node2.addTransition(ID_EPSILON_TRANSITION, final_node);
     		start_node.addTransition(ID_EPSILON_TRANSITION, final_node);
-    		toAutomata(tree.getSubTrees().get(0),node1,node2,ts);
+    		toAutomata(tree.getSubTrees().get(0),node1,node2);
         }
         if (tree.getRoot()==RegEx.ALTERN) {
         	
-        	RegExTree new_tree1 = new RegExTree( -2 , new ArrayList<RegExTree>());
-        	
-        	new_tree.subTrees.add(tree.getSubTrees().get(0));
-    		new_tree.subTrees.add(ts);
-    		
-    		new_tree1.subTrees.add(tree.getSubTrees().get(1));
-    		new_tree1.subTrees.add(ts);
-        	
-        	AutomataNodeND node1 = new AutomataNodeND(id_node, new_tree);
+        	AutomataNodeND node1 = new AutomataNodeND(id_node);
     		id_node++;
     		
-    		AutomataNodeND node2 = new AutomataNodeND(id_node, ts);
+    		AutomataNodeND node2 = new AutomataNodeND(id_node);
     		id_node++;
     		
-    		AutomataNodeND node3 = new AutomataNodeND(id_node, new_tree1);
+    		AutomataNodeND node3 = new AutomataNodeND(id_node);
     		id_node++;
     		
-    		AutomataNodeND node4 = new AutomataNodeND(id_node, ts);
+    		AutomataNodeND node4 = new AutomataNodeND(id_node);
     		id_node++;
     		
     		start_node.addTransition(ID_EPSILON_TRANSITION, node1);
@@ -609,13 +559,12 @@ class Automata
     		
     		node2.addTransition(ID_EPSILON_TRANSITION, final_node);
     		node4.addTransition(ID_EPSILON_TRANSITION, final_node);
-    		toAutomata(tree.getSubTrees().get(0),node1,node2,ts);
-    		toAutomata(tree.getSubTrees().get(1),node3,node4,ts);
+    		toAutomata(tree.getSubTrees().get(0),node1,node2);
+    		toAutomata(tree.getSubTrees().get(1),node3,node4);
         }
         
     	//Cas où il s'agit d'une feuille
     	if(tree.getSubTrees().isEmpty()) {
-    		final_node.tree.getSubTrees().add(new RegExTree(tree.getRoot(),new ArrayList<RegExTree>()));
     		start_node.addTransition(tree.getRoot(),final_node);
     		this.transitions_c.add(tree.getRoot());
     	}
@@ -653,16 +602,19 @@ class Automata
     		detTab((ArrayList<AutomataNodeND>) anc.clone(), noeud, trans);
     		if(noeud.getCourant().isEmpty()) {
     			this.racine_det.delLink(trans);
-    		}
-    		else if(noeud.isRedirection()) {
-    			this.racine_det.delLink(trans);
+			}
+			if(noeud.isRedirection()) {
     			if(noeud.getRedirection() == racine_det) {
+    				this.racine_det.addLink(trans, racine_det);
     				noeud.setRecursif();
     			}
     			else {
     				this.racine_det.addLink(trans, noeud.getRedirection());
     			}
-    		}
+			}
+			if(!noeud.getCourant().isEmpty() && !noeud.isRedirection()){
+				this.noeuds_det.add(noeud);
+			}
     	}
     }
     
@@ -678,7 +630,6 @@ class Automata
     		for(AutomataNodeND a : at) {
     			if(!etats_courant.contains(a)) {
 	    			etats_courant.add(a);
-	    			noeud.addChemin(a.getTree());
 	    			if(a.isAcceptance()) {
 	    				noeud.setAcceptance();
 	    			}
@@ -728,105 +679,89 @@ class Automata
     		
     		if(noeud1.getCourant().isEmpty()) {
     			noeud.delLink(trans);
-    		}
+			}
     		if(noeud1.isRedirection()) {
-    			noeud.delLink(trans);
     			if(noeud1.getRedirection() == noeud) {
+					noeud.addLink(trans, noeud);
     				noeud.setRecursif();
     			}
     			else {
     				noeud.addLink(trans, noeud1.getRedirection());
     			}
-    		}
+			}
+			if(!noeud1.isRedirection() && !noeud1.getCourant().isEmpty()){
+				noeuds_det.add(noeud1);
+			}
     	}
-    }
+	}
 
-    //Mise en place des redirections
-    public void red(AutomataNodeD node, ArrayList<AutomataNodeD> deja) {
-    			deja.add(node);
-    	for(int key : node.getLinks().keySet()) {
-    		if(node.getLink(key).isRedirection()) {
-    			node.addLink(key, node.getLink(key).getRedirection());
+	//Fonction optimisant un automate deterministe
+	public void optimi(){
+		merger();
+		while(boucle){
+			merger();
+		}
+	}
+	
+	//Fonction cherchant dans le tableau des etats les etats analogues et les fusionne
+	public void merger(){
+		int i,n;
+		for(i=noeuds_det.size()-1;i>=0;i=i-1){
+			n = analogue(i);
+			if(n>=0){
+				red(n,i);
+				i=i-1;
+			}
+		}
 
-    		}
-    		if(!deja.contains(node.getLink(key))) {
-    			red(node.getLink(key),deja);
-    		}
-    	}
+	}
+
+	//Fonction retournant l'indice d'un etat analogue a noeuds_det.get(n)
+	//-1 si aucun etat n'est analogue
+	public int analogue(int n){
+		boolean k;
+		int i = 0;
+		for(int noeudi=0; noeudi<this.noeuds_det.size(); noeudi++){
+			if(noeudi==n){
+				continue;
+			}
+			AutomataNodeD noeud = this.noeuds_det.get(noeudi);
+			k=true;
+			for(int l : this.transitions_c){
+				if(noeud.getLink(l) != this.noeuds_det.get(n).getLink(l)){
+					if(!((noeud.getLink(l) == n && this.noeuds_det.get(n).getLink(trans)==noeudi) || (noeud.getLink(l) == noeudi && this.noeuds_det.get(n).getLink(trans)==n) || (noeud.getLink(l)==noeud && this.noeuds_det.get(n).getLink(trans)==this.noeuds_det.get(n)))){
+						k=false;
+						break;
+					}
+				}
+			}
+			if(k){
+				return i;
+			}
+			i++;
+		}
+		return -1;
+	}
+
+	//Fonction faisait une permutation entre un etat et sa redirection
+	//Si l'indice d'un des noeuds verifié est superieur à redi on
+	//met la valeur de boucle a true
+    public void red(int ori, int redi) {
+
+		for(int noeudi=0; noeudi<this.noeuds_det.size(); noeudi++){
+			if(noeudi==ori)
+				continue;
+			AutomataNodeD noeud = this.noeuds_det.get(noeudi);
+			for(int l : noeud.getLinks().keySet()){
+				if(noeud.getLink(l)==this.noeuds_det.get(ori)){
+					noeud.addLink(l,this.noeuds_det.get(redi));
+					if(noeudi>redi){
+						boucle = true;
+					}
+				}
+			}
+
+		}
     }
     
-    //Optimisation de l'automate deterministe
-    public void opt(AutomataNodeD node, ArrayList<AutomataNodeD> deja) {
-    	int k = 0;
-    	for(ArrayList<String> l : this.path_node.keySet()) {
-    		if(node==this.path_node.get(l)) {
-    			continue;
-    		}
-    		for(String c : node.getCh()) {
-    			if(l.contains(c))
-    				k++;
-    		}
-    		if(k==node.getCh().size()) {
-    			node.setRedirection(this.path_node.get(l));
-    			break;
-    		}
-    		k=0;
-    	}
-    	
-    	for(int key : node.getLinks().keySet()) {
-    		if(!deja.contains(node.getLink(key))) {
-    			deja.add(node.getLink(key));
-    			opt(node.getLink(key),deja);
-    		}
-    	}
-    }
-    //Conversion des noeuds de l'automate deterministe en chaine de caractere
-    public void toMap(AutomataNodeD node, ArrayList<AutomataNodeD> deja) {
-		deja.add(node);
-    	ArrayList<String> cles = new ArrayList<String>();
-    	
-    	for(RegExTree t : node.getTree()){
-    		cles.addAll(tabStr(t,""));
-    	}
-    	while(cles.remove(""));
-    	node.setCh(cles);
-    	
-    	if(!this.path_node.containsKey(cles)) {
-    		this.path_node.put(cles, node);
-    	}
-    	else {
-    		node.setRedirection(this.path_node.get(cles));
-    	}
-    	
-    	for(int key : node.getLinks().keySet()) {
-    		if(!deja.contains(node.getLink(key))) {
-    			toMap(node.getLink(key),deja);
-    		}
-    	}
-    }
-    
-    //Fonction recursif convertissant un arbre en un tableau de string
-    public ArrayList<String> tabStr(RegExTree tree, String chemin){
-    	int c = tree.getRoot();
-    	ArrayList<String> l = new ArrayList<String>();
-    	
-    	if(tree.getSubTrees().size()==0) {
-    			if(c==-2) {
-    				l.add(chemin);
-    			}else {
-    				l.add(chemin+"."+c);
-    			}
-    			return l;
-   		}
-   		for(RegExTree t : tree.getSubTrees()) {
-    		if(c==-2) {
-    			l.addAll(tabStr(t,chemin));
-    		} else {
-    			l.addAll(tabStr(t,chemin+"."+c));
-    		}
-    	}
-    	
-    
-    	return l;
-    }
 }
