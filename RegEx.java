@@ -51,7 +51,7 @@ public class RegEx {
         RegExTree ret = parse();
         Automata a = new Automata(ret);
         System.out.println(a.toString());
-        System.out.println(a.toStringTab());
+        a.toStringTab();
         System.out.println("  >> Tree result: "+ret.toString()+".");
       } catch (Exception e) {
         System.err.println("  >> ERROR: syntax error for regEx \""+regEx+"  cause = "+e.toString()+"\".");
@@ -329,8 +329,10 @@ class AutomataNodeD{
 	public boolean recursif; //determine si le noeud est recursif
 	public boolean redirect; // determine si un noeud redirigie vers un autre
 	public AutomataNodeD redirection; 
+	public String chemin;
 	
-	public AutomataNodeD() {
+	public AutomataNodeD(String chemin) {
+		this.chemin = chemin;
 		this.acceptance = false;
 		this.redirect = false;
 		this.recursif = false;
@@ -432,12 +434,12 @@ class Automata
 		this.boucle = false;
         
         this.transitions_c = new ArrayList<Integer>();
-		racine_det = new AutomataNodeD();
+		racine_det = new AutomataNodeD("");
 		this.noeuds_det = new ArrayList<AutomataNodeD>();
 		this.noeuds_det.add(racine_det);
         toAutomata(mytree,start_node,final_node);
 		detTabStart();
-		//optimi();
+		optimi();
 	}
 	
 	
@@ -456,7 +458,10 @@ class Automata
     		chaine += aut.getId();
     		deja.add(aut.getId());
     		for(int a : aut.getTransitions().keySet()) {
-    			chaine += "  n"+ (char)a+" -> "+ ArraytoString(aut.getTransition(a));
+    			if(a==-1)
+    				chaine += "  n"+a+" -> "+ ArraytoString(aut.getTransition(a));
+    			else
+    				chaine += "  n"+ (char)a+" -> "+ ArraytoString(aut.getTransition(a));
     		}
     		chaine += "    \n";
     		for(int a : aut.getTransitions().keySet()) {
@@ -468,46 +473,11 @@ class Automata
     	return chaine;
     }
     
-    public String toStringRecTab(AutomataNodeD n, String chemin, ArrayList<AutomataNodeD> deja) {
-    	String chaine = "";
-    	if(deja.contains(n)) {
-    		return chaine;
-    	}
-		deja.add(n);
-		chaine += "+"+n.getLinks().keySet();
-    	
-    	if((!n.isRecursif()) && (!n.isAcceptance())){
-    		chaine += chemin + " : ";
-    	} else if(n.isRecursif() && n.isAcceptance()) {
-    		chaine += chemin + "-RF" + " : ";
-    	} else if(n.isRecursif()) {
-    		chaine += chemin + "-R" + " : ";
-    	} else {
-    		chaine += chemin + "-F" + " : ";
-    	}
-    	for(AutomataNodeND l : n.getCourant()) {
-    		chaine += " _ "+l.getId();
-    	}
-    	chaine += "\n";
-    	
-    	for(int noeudi : n.getLinks().keySet()) {
-    		chaine += toStringRecTab(n.getLink(noeudi),chemin+"-"+(char)noeudi,deja );
-    	}
-    	
-    	return chaine;
-    }
-    
     public String toString() {
     	String chaine = "Chaque ligne correspond a la liste des liens d'un noeud.\n n-1 correspond a la transition epsilon.\n";
     	ArrayList<Integer> deja = new ArrayList<Integer>();//cette arraylist servira a identifier les noeuds deja rencontree
 
     	return chaine+toStringRec(start_node, deja);
-    }
-    
-    public String toStringTab() {
-    	String chaine = "Chaque ligne correspond a un noeud suivie par les etats de ce noeud.\n\n";
-    	ArrayList<AutomataNodeD> deja = new ArrayList<AutomataNodeD>();//cette arraylist servira a identifier les noeuds deja rencontree
-    	return chaine+toStringRecTab(this.racine_det,"0",deja);
     }
 
 
@@ -566,7 +536,8 @@ class Automata
     	//Cas où il s'agit d'une feuille
     	if(tree.getSubTrees().isEmpty()) {
     		start_node.addTransition(tree.getRoot(),final_node);
-    		this.transitions_c.add(tree.getRoot());
+    		if(!this.transitions_c.contains(tree.getRoot()))
+    			this.transitions_c.add(tree.getRoot());
     	}
     	
     }
@@ -596,10 +567,10 @@ class Automata
     	}
     	
     	for(int trans : this.transitions_c) {
-    		AutomataNodeD noeud = new AutomataNodeD();
+    		AutomataNodeD noeud = new AutomataNodeD(((char)trans)+"");
     		noeud.setAncetre(ancnd);
     		this.racine_det.addLink(trans, noeud);
-    		detTab((ArrayList<AutomataNodeND>) anc.clone(), noeud, trans);
+    		detTab((ArrayList<AutomataNodeND>) anc.clone(), noeud, trans,((char)trans)+"");
     		if(noeud.getCourant().isEmpty()) {
     			this.racine_det.delLink(trans);
 			}
@@ -612,14 +583,14 @@ class Automata
     				this.racine_det.addLink(trans, noeud.getRedirection());
     			}
 			}
-			if(!noeud.getCourant().isEmpty() && !noeud.isRedirection()){
+			if((!noeud.getCourant().isEmpty()) && (!noeud.isRedirection())){
 				this.noeuds_det.add(noeud);
 			}
     	}
     }
     
     //determination de l'automate deterministe
-    public void detTab(ArrayList<AutomataNodeND> ancetres_direct, AutomataNodeD noeud, int current_link) {
+    public void detTab(ArrayList<AutomataNodeND> ancetres_direct, AutomataNodeD noeud, int current_link, String chemin) {
     	ArrayList<AutomataNodeND> etats_courant = new ArrayList<AutomataNodeND>();
     	int i;
     	
@@ -670,12 +641,12 @@ class Automata
     	}
     	
     	for(int trans : this.transitions_c) {
-    		AutomataNodeD noeud1 = new AutomataNodeD();
+    		AutomataNodeD noeud1 = new AutomataNodeD(chemin+((char)trans));
     		noeud.addLink(trans, noeud1);
     		ArrayList<AutomataNodeD> l = (ArrayList<AutomataNodeD>) noeud.getAncetres().clone();
     		l.add(noeud);
     		noeud1.setAncetre(l);
-    		detTab((ArrayList<AutomataNodeND>) etats_courant.clone(), noeud1, trans);
+    		detTab((ArrayList<AutomataNodeND>) etats_courant.clone(), noeud1, trans, chemin+((char)trans));
     		
     		if(noeud1.getCourant().isEmpty()) {
     			noeud.delLink(trans);
@@ -689,7 +660,7 @@ class Automata
     				noeud.addLink(trans, noeud1.getRedirection());
     			}
 			}
-			if(!noeud1.isRedirection() && !noeud1.getCourant().isEmpty()){
+			if((!noeud1.isRedirection()) && (!noeud1.getCourant().isEmpty())){
 				noeuds_det.add(noeud1);
 			}
     	}
@@ -699,6 +670,7 @@ class Automata
 	public void optimi(){
 		merger();
 		while(boucle){
+			boucle = false;
 			merger();
 		}
 	}
@@ -706,39 +678,60 @@ class Automata
 	//Fonction cherchant dans le tableau des etats les etats analogues et les fusionne
 	public void merger(){
 		int i,n;
-		for(i=noeuds_det.size()-1;i>=0;i=i-1){
+		for(i=(noeuds_det.size()-1);i>=0;i=i-1){
 			n = analogue(i);
 			if(n>=0){
 				red(n,i);
-				i=i-1;
+				this.noeuds_det.remove(n);
+				if(n>i)
+					i++;
 			}
 		}
 
 	}
+	
+	public void toStringTab() {
+		int i =0;
+		String chaine;
+		System.out.println("Automate Deterministe.");
+		for(AutomataNodeD n : this.noeuds_det) {
+			chaine = "";
+			if(n.isAcceptance())
+				chaine+="acceptation;";
+			if(n.isRecursif())
+				chaine+="recursif;";
+			System.out.println("adresse = "+n+" chemin : "+n.chemin + " Liens = "+n.getLinks() + " indice  = "+i+" "+chaine);
+			i++;
+		}
+	}
 
-	//Fonction retournant l'indice d'un etat analogue a noeuds_det.get(n)
+	//Fonction retournant l'indice d'un etat analogue a noeuds_de6t.get(n)
 	//-1 si aucun etat n'est analogue
 	public int analogue(int n){
 		boolean k;
-		int i = 0;
+		AutomataNodeD noeudo = this.noeuds_det.get(n);
 		for(int noeudi=0; noeudi<this.noeuds_det.size(); noeudi++){
 			if(noeudi==n){
 				continue;
 			}
 			AutomataNodeD noeud = this.noeuds_det.get(noeudi);
+			if((noeudo.isRecursif() && (!noeud.isRecursif())) || ((!noeudo.isRecursif()) && noeud.isRecursif()))
+					continue;
+			if((noeudo.isAcceptance() && (!noeud.isAcceptance())) || ((!noeudo.isAcceptance()) && noeud.isAcceptance()))
+				continue;
 			k=true;
 			for(int l : this.transitions_c){
-				if(noeud.getLink(l) != this.noeuds_det.get(n).getLink(l)){
-					if(!((noeud.getLink(l) == n && this.noeuds_det.get(n).getLink(trans)==noeudi) || (noeud.getLink(l) == noeudi && this.noeuds_det.get(n).getLink(trans)==n) || (noeud.getLink(l)==noeud && this.noeuds_det.get(n).getLink(trans)==this.noeuds_det.get(n)))){
+				if(noeud.getLink(l) != noeudo.getLink(l)){
+					if(!((noeud.getLink(l) == noeudo && noeudo.getLink(l)==noeud) 
+							|| (noeud.getLink(l) == noeud && noeudo.getLink(l)==noeudo))){
 						k=false;
 						break;
 					}
 				}
 			}
-			if(k){
-				return i;
+			if(k && noeudo.getLinks().keySet().size() == noeud.getLinks().keySet().size()){
+				return noeudi;
 			}
-			i++;
 		}
 		return -1;
 	}
@@ -747,7 +740,6 @@ class Automata
 	//Si l'indice d'un des noeuds verifié est superieur à redi on
 	//met la valeur de boucle a true
     public void red(int ori, int redi) {
-
 		for(int noeudi=0; noeudi<this.noeuds_det.size(); noeudi++){
 			if(noeudi==ori)
 				continue;
@@ -755,6 +747,9 @@ class Automata
 			for(int l : noeud.getLinks().keySet()){
 				if(noeud.getLink(l)==this.noeuds_det.get(ori)){
 					noeud.addLink(l,this.noeuds_det.get(redi));
+					if(redi==noeudi) {
+						noeud.setRecursif();
+					}
 					if(noeudi>redi){
 						boucle = true;
 					}
