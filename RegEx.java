@@ -11,6 +11,10 @@ import java.util.HashMap;
 import java.awt.List;
 import java.lang.Exception;
 
+import java.io.File;  
+import java.io.FileNotFoundException; 
+import java.util.Scanner; 
+
 public class RegEx {
   //MACROS
   static final int CONCAT = 0xC04CA7;
@@ -27,9 +31,23 @@ public class RegEx {
   
   //CONSTRUCTOR
   public RegEx(){}
-
+	//TEST!!!!!!!!!!!
+	public static String toStringn(int[] tab){
+		String chaine = "";
+		String schaine = "";
+		 for(int i : tab) {
+			 schaine = chaine;
+			 chaine +=i+",";
+			 schaine +=i;
+		 }
+		 
+		 return "["+schaine+"]";
+		}
+		  
   //MAIN
   public static void main(String arg[]) {
+	  
+	  
     System.out.println("Welcome to Bogota, Mr. Thomas Anderson.");
     if (arg.length!=0) {
       regEx = arg[0];
@@ -52,6 +70,19 @@ public class RegEx {
         Automata a = new Automata(ret);
         System.out.println(a.toString());
         a.toStringTab();
+        String ch = "Sargon";
+        System.out.println("retenue de "+ch+" => "+toStringn((new RetenueFacteur(ch)).getRetenue()));
+        ch = "chicha";
+        System.out.println("retenue de "+ch+" => "+toStringn((new RetenueFacteur(ch)).getRetenue()));
+        ch = "mamamia";
+        System.out.println("retenue de "+ch+" => "+toStringn((new RetenueFacteur(ch)).getRetenue()));
+        
+        String facteur = "5";
+        String filename = "text.txt";
+        
+        System.out.println("On a "+(new Recherche(filename,facteur)).getNombre()+" apparations.");
+        
+        
         System.out.println("  >> Tree result: "+ret.toString()+".");
       } catch (Exception e) {
         System.err.println("  >> ERROR: syntax error for regEx \""+regEx+"  cause = "+e.toString()+"\".");
@@ -759,4 +790,120 @@ class Automata
 		}
     }
     
+}
+
+//Classe calculant la retenue d'un facteur
+class RetenueFacteur{
+	public String facteur;
+	public RetenueFacteur(String facteur) {
+		this.facteur = facteur;
+	}
+	//Retourne la retenue d'un caractere d'indice indice
+	private int Retenue(int indice) {
+		int k = 0;
+		if(this.facteur.charAt(indice) == this.facteur.charAt(0)) {
+			k=-1;
+		}
+			
+		int j;
+		String suff,preff;
+		for(j=0;j<indice-1;j++) {
+			if(this.facteur.charAt(indice) == this.facteur.charAt(j+1)) {
+				continue;
+			}
+			
+			preff = this.facteur.substring(0, j+1);
+			suff = this.facteur.substring(indice-j-1, indice);
+			if(preff.equals(suff)) {
+				k = j+1;
+			}
+		}
+		return k;
+	}
+	//Retenue pour fin de chaine
+	private int Retenuel() {
+		int k = 0;
+		int j;
+		String suff,preff;
+		for(j=0;j<this.facteur.length()-1;j++) {
+			preff = this.facteur.substring(0, j+1);
+			suff = this.facteur.substring(this.facteur.length()-j-1, this.facteur.length());
+			if(preff.equals(suff))
+				k = j+1;
+		}
+		return k;
+	}
+	
+	public int[] getRetenue() {
+		int[] retenues = new int[this.facteur.length()+1];
+		int indice;
+		retenues[0] = -1;
+		for(indice = 1;indice<this.facteur.length(); indice++) {
+			retenues[indice] = Retenue(indice);
+		}
+		if(this.facteur.length()>0)
+			retenues[indice] = Retenuel();
+		return retenues;
+	}
+}
+
+class Recherche{
+	public String text;
+	public int[] retenue;
+	public String facteur;
+	public int nombre;
+	public ArrayList<Integer> apparaitions;
+	
+	public Recherche(String filename, String facteur) {
+		ReadFile(filename);
+		nombre = 0;
+		this.facteur = facteur;
+		this.apparaitions = new ArrayList<Integer>();
+		this.retenue = (new RetenueFacteur(facteur)).getRetenue();
+		Rechercher(facteur);
+		
+	}
+	
+	public int getNombre() {
+		return this.nombre;
+	}
+	
+	public ArrayList<Integer> getApparations(){
+		return this.apparaitions;
+	}
+	
+	private void Rechercher(String facteur) {
+		int indice;
+		int i;
+		for(indice=0;indice<text.length()-facteur.length()+1;indice++) {
+			for(i = 0;i<facteur.length();i++) {
+				if(text.charAt(indice)!=facteur.charAt(i)) {
+					indice += (retenue[i]*-1)-1;
+					break;
+				}
+				indice ++;
+			}
+			if(i==facteur.length()) {
+				nombre++;
+				apparaitions.add(indice);
+				indice += (-1*retenue[i]);
+			}
+		}
+	}
+
+	public void ReadFile(String filename) {
+	    try {
+	      File myObj = new File(filename);
+	      Scanner myReader = new Scanner(myObj);
+	      while (myReader.hasNextLine()) {
+	        String data = myReader.nextLine();
+	        this.text += data+"\n";
+	      }
+	      myReader.close();
+	    } catch (FileNotFoundException e) {
+	      System.out.println("An error occurred.");
+	      e.printStackTrace();
+	    }
+	  }
+	
 }
