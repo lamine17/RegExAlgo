@@ -80,7 +80,7 @@ public class RegEx {
         String facteur = "5";
         String filename = "text.txt";
         
-        System.out.println("On a "+(new Recherche(filename,facteur)).getNombre()+" apparations.");
+        System.out.println("On a "+(new RechercheAutomata(ret,filename)).getNombre()+" apparations.");
         
         
         System.out.println("  >> Tree result: "+ret.toString()+".");
@@ -361,17 +361,27 @@ class AutomataNodeD{
 	public boolean redirect; // determine si un noeud redirigie vers un autre
 	public AutomataNodeD redirection; 
 	public String chemin;
+	private int retenue;
 	
 	public AutomataNodeD(String chemin) {
 		this.chemin = chemin;
 		this.acceptance = false;
+		this.retenue = 0;
 		this.redirect = false;
 		this.recursif = false;
 		this.ancetres = new ArrayList<AutomataNodeD>();
 		this.courant = new ArrayList<AutomataNodeND>();
 		this.liens = new HashMap<Integer,AutomataNodeD>();
 	}
+
+	public int getRetenue() {
+		return this.retenue;
+	}
 	
+	public void setRetenue(int r) {
+		this.retenue = r;
+	}
+    
 	public void setAncetre(ArrayList<AutomataNodeD> anc) {
 		this.ancetres = anc;
 	}
@@ -463,7 +473,8 @@ class Automata
         id_node++;
 		final_node.setAcceptance();
 		this.boucle = false;
-        
+		
+		
         this.transitions_c = new ArrayList<Integer>();
 		racine_det = new AutomataNodeD("");
 		this.noeuds_det = new ArrayList<AutomataNodeD>();
@@ -472,9 +483,11 @@ class Automata
 		detTabStart();
 		optimi();
 	}
-	
-	
     
+    public AutomataNodeD getRacine() {
+    	return this.racine_det;
+    }
+	
     public String ArraytoString(ArrayList<AutomataNodeND> an) {
     	String chaine = "";
     	for(AutomataNodeND a : an) {
@@ -845,6 +858,123 @@ class RetenueFacteur{
 			retenues[indice] = Retenuel();
 		return retenues;
 	}
+}
+
+//Classe calculant la retenue d'un automate deterministe
+class RetenueAutomata{
+	public AutomataNodeD automata;
+	public String prefixe;
+	public RetenueAutomata(AutomataNodeD automata) {
+		this.automata = automata;
+		this.prefixe = "";
+		this.setPrefixe(automata);
+		this.setRetenue(automata, "");
+	}
+	
+	public String getPrefixe() {
+		return this.prefixe;
+	}
+	
+	public void setPrefixe(AutomataNodeD node) {
+		int k;
+		if(node.getLinks().keySet().size()==1) {
+			k = (int) node.getLinks().keySet().toArray()[0];
+			this.prefixe += ((char)k);
+			setPrefixe(node.getLink(k));
+		}
+	}
+	
+	public void setRetenue(AutomataNodeD node, String retenue) {
+		 if(this.prefixe.length()==0 || retenue.length() == 0) {
+			 node.setRetenue(0);
+		 }
+		 else {
+			 int l = Integer.max(this.prefixe.length(), retenue.length());
+			 String newPrefixe = this.prefixe.substring(0, l);
+			 String oldretenue = retenue.substring(Integer.max(0,retenue.length()-l),retenue.length());
+			 while(!newPrefixe.equals(oldretenue)) {
+				 l=l-1;
+				 newPrefixe = newPrefixe.substring(0, l);
+				 oldretenue = oldretenue.substring(Integer.max(0,retenue.length()-l),retenue.length());
+			 }
+			 node.setRetenue(l+1);
+		 }
+		 if(node.getLinks().keySet().size()>1) {
+			 for(int a : node.getLinks().keySet()) {
+				 setRetenue(node.getLink(a),""+((char)a));
+			 }
+		 } else if(node.getLinks().keySet().size()==1) {
+			 for(int a : node.getLinks().keySet()) {
+				 setRetenue(node.getLink(a),retenue+((char)a));
+			 }
+		 }
+	}
+	
+}
+
+//Effectuie une recherche a partir d'un automate
+class RechercheAutomata{
+	public AutomataNodeD automata;
+	public String text;
+	public int nombre;
+	public int pref;
+	public ArrayList<Integer> apparaitions;
+	
+	public RechercheAutomata(RegExTree tree, String filename) {
+		this.automata = (new Automata(tree)).getRacine();
+		RetenueAutomata ret = (new RetenueAutomata(automata));
+		ReadFile(filename);
+		this.apparaitions = new ArrayList<Integer>();
+		this.pref = ret.getPrefixe().length();
+		Rechercher();
+	}
+	
+	private void Rechercher() {
+		int indice;
+		AutomataNodeD courant;
+		int i;
+		for(indice=0;indice<text.length();indice++) {
+			courant = this.automata;
+			i=0;
+			while(!courant.isAcceptance()){
+				if(!courant.getLinks().containsKey((int)text.charAt(i+indice))) {
+					indice += courant.getRetenue();
+					break;
+				}
+				courant = courant.getLink((int)text.charAt(i+indice));
+				i++;
+			}
+			if(courant.isAcceptance()) {
+				nombre++;
+				apparaitions.add(indice);
+			}
+		}
+	}
+
+	public int getNombre() {
+		return this.nombre;
+	}
+	
+	public ArrayList<Integer> getApparations(){
+		return this.apparaitions;
+	}
+	
+
+	public void ReadFile(String filename) {
+	    try {
+	      File myObj = new File(filename);
+	      Scanner myReader = new Scanner(myObj);
+	      while (myReader.hasNextLine()) {
+	        String data = myReader.nextLine();
+	        this.text += data+"\n";
+	      }
+	      myReader.close();
+	    } catch (FileNotFoundException e) {
+	      System.out.println("An error occurred.");
+	      e.printStackTrace();
+	    }
+	  }
+	
 }
 
 class Recherche{
